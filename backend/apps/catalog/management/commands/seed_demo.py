@@ -2,9 +2,14 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from apps.catalog.models import Component, Criticality, MedicalProduct, ProductStatus, ProductVariant
+from apps.catalog.models import (
+    Component,
+    Criticality,
+    MedicalProduct,
+    ProductStatus,
+    ProductVariant,
+)
 from apps.fmea.models import (
-    ActionPriority,
     DependencyType,
     FMEAItem,
     FMEARevision,

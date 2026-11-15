@@ -17,7 +17,7 @@ class Criticality(models.TextChoices):
 class MedicalProduct(models.Model):
     code = models.CharField("Обозначение", max_length=100, unique=True)
     name = models.CharField("Наименование", max_length=255)
-    manufacturer = models.CharField("Изготовитель", max_length=255)
+    manufacturer = models.CharField("Изготовитель", max_length=255, blank=True)
     tu_code = models.CharField("Обозначение ТУ", max_length=100, blank=True)
     description = models.TextField("Описание", blank=True)
     status = models.CharField(
