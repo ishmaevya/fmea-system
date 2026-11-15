@@ -185,6 +185,11 @@ class FMEAItem(models.Model):
     def __str__(self):
         return f"{self.component.code}: {self.failure_mode} (RPN={self.rpn})"
 
+    def save(self, *args, **kwargs):
+        self.rpn = self.severity * self.occurrence * self.detection
+        self.action_priority = self.calc_priority(self.rpn)
+        super().save(*args, **kwargs)
+
     @staticmethod
     def calc_priority(rpn: int) -> str:
         if rpn >= 250:
@@ -200,11 +205,6 @@ class FMEAItem(models.Model):
         if self.component_id and self.revision_id:
             if self.component.product_id != self.revision.product_id:
                 raise ValidationError("Компонент должен принадлежать тому же изделию, что и ревизия")
-
-    def save(self, *args, **kwargs):
-        self.rpn = self.severity * self.occurrence * self.detection
-        self.action_priority = self.calc_priority(self.rpn)
-        super().save(*args, **kwargs)
 
 
 class RiskDependency(models.Model):

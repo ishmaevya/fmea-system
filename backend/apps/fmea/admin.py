@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AuditLog, Attachment, FMEAItem, FMEARevision, LLMSuggestion, RiskDependency
+from .models import Attachment, AuditLog, FMEAItem, FMEARevision, LLMSuggestion, RiskDependency
 
 
 @admin.register(FMEARevision)

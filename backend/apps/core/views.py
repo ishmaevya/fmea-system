@@ -1,6 +1,7 @@
 from django.core.cache import cache
 from django.db import connection
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.decorators import (
     api_view,
@@ -14,6 +15,14 @@ SERVICE_NAME = "fmea-backend"
 SERVICE_VERSION = "0.1.0"
 
 
+@extend_schema(
+    tags=["Служебные"],
+    summary="Проверка состояния сервиса",
+    responses={
+        200: OpenApiResponse(description="Сервис работает"),
+        503: OpenApiResponse(description="Сервис деградирован"),
+    },
+)
 @api_view(["GET"])
 @authentication_classes([])
 @permission_classes([AllowAny])
