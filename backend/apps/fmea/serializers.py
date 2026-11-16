@@ -3,8 +3,9 @@ from rest_framework import serializers
 
 from apps.catalog.models import MedicalProduct, ProductVariant
 
+from .attachments import get_download_url, save_attachment, validate_attachment_file
 from .audit import log_action
-from .models import FMEAItem, FMEARevision, RiskDependency
+from .models import Attachment, FMEAItem, FMEARevision, RiskDependency
 from .services import create_revision, ensure_revision_editable
 
 
@@ -392,3 +393,66 @@ class RevisionGraphSerializer(serializers.Serializer):
     revision = serializers.IntegerField()
     nodes = GraphNodeSerializer(many=True)
     edges = GraphEdgeSerializer(many=True)
+
+
+class AttachmentSerializer(serializers.ModelSerializer):
+    uploaded_by_email = serializers.CharField(source="uploaded_by.email", read_only=True)
+    download_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Attachment
+        fields = (
+            "id",
+            "product",
+            "revision",
+            "item",
+            "original_name",
+            "content_type",
+            "size",
+            "uploaded_by",
+            "uploaded_by_email",
+            "download_url",
+            "created_at",
+        )
+        read_only_fields = fields
+
+    def get_download_url(self, obj) -> str | None:
+        try:
+            return get_download_url(obj.file)
+        except Exception:
+            return None
+
+
+class AttachmentUploadSerializer(serializers.Serializer):
+    file = serializers.FileField(write_only=True)
+    product = serializers.PrimaryKeyRelatedField(
+        queryset=MedicalProduct.objects.all(), required=False, allow_null=True
+    )
+    revision = serializers.PrimaryKeyRelatedField(
+        queryset=FMEARevision.objects.all(), required=False, allow_null=True
+    )
+    item = serializers.PrimaryKeyRelatedField(
+        queryset=FMEAItem.objects.all(), required=False, allow_null=True
+    )
+
+    def validate(self, attrs):
+        targets = [
+            name for name in ("product", "revision", "item") if attrs.get(name) is not None
+        ]
+        if len(targets) != 1:
+            raise serializers.ValidationError(
+                {"target": "Укажите ровно один объект: product, revision или item"}
+            )
+        validate_attachment_file(attrs["file"])
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        return save_attachment(
+            user=request.user,
+            request=request,
+            file=validated_data["file"],
+            product=validated_data.get("product"),
+            revision=validated_data.get("revision"),
+            item=validated_data.get("item"),
+        )

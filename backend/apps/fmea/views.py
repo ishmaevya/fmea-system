@@ -7,10 +7,13 @@ from rest_framework.response import Response
 
 from apps.accounts.permissions import IsAdminRole, IsEngineerOrAbove, IsQualityOrAdmin
 
+from .attachments import delete_attachment, get_download_url
 from .audit import log_action
 from .filters import FMEAItemFilter
-from .models import FMEAItem, FMEARevision, RiskDependency
+from .models import Attachment, FMEAItem, FMEARevision, RiskDependency
 from .serializers import (
+    AttachmentSerializer,
+    AttachmentUploadSerializer,
     BulkItemsSerializer,
     CloneRevisionSerializer,
     FMEAItemSerializer,
@@ -402,3 +405,71 @@ class DependencyViewSet(
         )
         dependency.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@extend_schema_view(
+    list=extend_schema(tags=["Вложения"], summary="Список вложений"),
+    retrieve=extend_schema(tags=["Вложения"], summary="Вложение"),
+    create=extend_schema(
+        tags=["Вложения"],
+        summary="Загрузить вложение",
+        request=AttachmentUploadSerializer,
+        responses={201: AttachmentSerializer},
+    ),
+    destroy=extend_schema(tags=["Вложения"], summary="Удалить вложение"),
+    download=extend_schema(
+        tags=["Вложения"],
+        summary="Ссылка на скачивание вложения",
+        responses={200: OpenApiResponse(description="Presigned URL и срок жизни")},
+    ),
+)
+class AttachmentViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    queryset = Attachment.objects.select_related(
+        "product", "revision", "item", "uploaded_by"
+    )
+    serializer_class = AttachmentSerializer
+    filterset_fields = ("product", "revision", "item")
+    search_fields = ("original_name",)
+    ordering = ("-created_at",)
+    permission_classes = (IsAuthenticated,)
+
+    def get_permissions(self):
+        if self.action == "create":
+            return [IsEngineerOrAbove()]
+        return [IsAuthenticated()]
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return AttachmentUploadSerializer
+        return AttachmentSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        if data.get("revision") is not None:
+            ensure_revision_editable(data["revision"], request.user)
+        if data.get("item") is not None:
+            ensure_revision_editable(data["item"].revision, request.user)
+
+        attachment = serializer.save()
+        output = AttachmentSerializer(attachment, context=self.get_serializer_context())
+        headers = self.get_success_headers(output.data)
+        return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def destroy(self, request, *args, **kwargs):
+        attachment = self.get_object()
+        delete_attachment(attachment=attachment, user=request.user, request=request)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get"])
+    def download(self, request, pk=None):
+        attachment = self.get_object()
+        url = get_download_url(attachment.file)
+        return Response({"url": url, "expires_in": 3600})
