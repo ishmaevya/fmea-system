@@ -212,6 +212,11 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "API системы анализа видов и последствий отказов медицинских изделий.",
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "ENUM_NAME_OVERRIDES": {
+        "ProductStatusEnum": "apps.catalog.models.ProductStatus",
+        "RevisionStatusEnum": "apps.fmea.models.RevisionStatus",
+        "ItemStatusEnum": "apps.fmea.models.ItemStatus",
+    },
 }
 
 LOGGING = {
