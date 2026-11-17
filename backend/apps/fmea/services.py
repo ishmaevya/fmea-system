@@ -111,9 +111,7 @@ def clone_revision(
     change_reason: str = "",
     request=None,
 ) -> FMEARevision:
-    _ensure_status(
-        source, RevisionStatus.DRAFT, RevisionStatus.REVIEW, RevisionStatus.APPROVED
-    )
+    _ensure_status(source, RevisionStatus.DRAFT, RevisionStatus.REVIEW, RevisionStatus.APPROVED)
 
     target = create_revision(
         product=source.product,
@@ -191,9 +189,7 @@ def _validate_items(revision: FMEARevision) -> None:
     invalid = []
     for item in revision.items.all():
         blank = not (
-            item.failure_mode.strip()
-            and item.failure_cause.strip()
-            and item.failure_effect.strip()
+            item.failure_mode.strip() and item.failure_cause.strip() and item.failure_effect.strip()
         )
         out_of_range = not all(
             1 <= value <= 10 for value in (item.severity, item.occurrence, item.detection)

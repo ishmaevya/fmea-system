@@ -228,9 +228,7 @@ def test_component_parent_cycle_rejected(api_client, engineer, product):
     )
     assert self_parent.status_code == 400
 
-    cycle = api_client.patch(
-        f"/api/components/{first.pk}/", {"parent": second.pk}, format="json"
-    )
+    cycle = api_client.patch(f"/api/components/{first.pk}/", {"parent": second.pk}, format="json")
     assert cycle.status_code == 400
     assert "parent" in cycle.json()
 

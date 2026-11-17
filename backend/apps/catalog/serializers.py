@@ -38,8 +38,7 @@ class ProductSerializer(serializers.ModelSerializer):
             request = self.context.get("request")
             if not is_quality_or_admin(getattr(request, "user", None)):
                 raise PermissionDenied(
-                    "Изменение статуса изделия доступно менеджеру по качеству "
-                    "или администратору"
+                    "Изменение статуса изделия доступно менеджеру по качеству или администратору"
                 )
         return super().update(instance, validated_data)
 

@@ -1,11 +1,18 @@
 from django.db import transaction
 from rest_framework import serializers
 
-from apps.catalog.models import MedicalProduct, ProductVariant
+from apps.catalog.models import Component, MedicalProduct, ProductVariant
 
 from .attachments import get_download_url, save_attachment, validate_attachment_file
 from .audit import log_action
-from .models import Attachment, FMEAItem, FMEARevision, RiskDependency
+from .llm import create_suggestion
+from .models import (
+    Attachment,
+    FMEAItem,
+    FMEARevision,
+    LLMSuggestion,
+    RiskDependency,
+)
 from .services import create_revision, ensure_revision_editable
 
 
@@ -235,9 +242,7 @@ class BulkItemsSerializer(serializers.Serializer):
         existing = set(revision.items.filter(pk__in=all_ids).values_list("pk", flat=True))
         missing = sorted(all_ids - existing)
         if missing:
-            raise serializers.ValidationError(
-                {"items": f"Пункты не найдены в ревизии: {missing}"}
-            )
+            raise serializers.ValidationError({"items": f"Пункты не найдены в ревизии: {missing}"})
 
         return attrs
 
@@ -332,9 +337,7 @@ class RiskDependencySerializer(serializers.ModelSerializer):
 
         source = attrs.get("source_item") or getattr(self.instance, "source_item", None)
         target = attrs.get("target_item") or getattr(self.instance, "target_item", None)
-        relation_type = attrs.get("relation_type") or getattr(
-            self.instance, "relation_type", None
-        )
+        relation_type = attrs.get("relation_type") or getattr(self.instance, "relation_type", None)
 
         if source is None:
             raise serializers.ValidationError({"source_item": "Обязательное поле"})
@@ -436,9 +439,7 @@ class AttachmentUploadSerializer(serializers.Serializer):
     )
 
     def validate(self, attrs):
-        targets = [
-            name for name in ("product", "revision", "item") if attrs.get(name) is not None
-        ]
+        targets = [name for name in ("product", "revision", "item") if attrs.get(name) is not None]
         if len(targets) != 1:
             raise serializers.ValidationError(
                 {"target": "Укажите ровно один объект: product, revision или item"}
@@ -456,3 +457,55 @@ class AttachmentUploadSerializer(serializers.Serializer):
             revision=validated_data.get("revision"),
             item=validated_data.get("item"),
         )
+
+
+class SuggestionRequestSerializer(serializers.Serializer):
+    revision = serializers.PrimaryKeyRelatedField(queryset=FMEARevision.objects.all())
+    component = serializers.PrimaryKeyRelatedField(queryset=Component.objects.all())
+    hints = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+
+    def validate(self, attrs):
+        if attrs["component"].product_id != attrs["revision"].product_id:
+            raise serializers.ValidationError(
+                {"component": "Компонент должен принадлежать изделию ревизии"}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        return create_suggestion(
+            revision=validated_data["revision"],
+            component=validated_data["component"],
+            user=request.user,
+            hints=validated_data.get("hints", ""),
+            request=request,
+        )
+
+
+class SuggestionSerializer(serializers.ModelSerializer):
+    component_code = serializers.CharField(source="component.code", read_only=True)
+    component_name = serializers.CharField(source="component.name", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    created_by_email = serializers.CharField(source="created_by.email", read_only=True)
+
+    class Meta:
+        model = LLMSuggestion
+        fields = (
+            "id",
+            "product",
+            "revision",
+            "component",
+            "component_code",
+            "component_name",
+            "prompt",
+            "response",
+            "provider",
+            "model_name",
+            "status",
+            "status_display",
+            "applied_item",
+            "created_by",
+            "created_by_email",
+            "created_at",
+        )
+        read_only_fields = fields

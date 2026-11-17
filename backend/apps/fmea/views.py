@@ -10,7 +10,14 @@ from apps.accounts.permissions import IsAdminRole, IsEngineerOrAbove, IsQualityO
 from .attachments import delete_attachment, get_download_url
 from .audit import log_action
 from .filters import FMEAItemFilter
-from .models import Attachment, FMEAItem, FMEARevision, RiskDependency
+from .llm import apply_suggestion, reject_suggestion
+from .models import (
+    Attachment,
+    FMEAItem,
+    FMEARevision,
+    LLMSuggestion,
+    RiskDependency,
+)
 from .serializers import (
     AttachmentSerializer,
     AttachmentUploadSerializer,
@@ -22,6 +29,8 @@ from .serializers import (
     RevisionGraphSerializer,
     RevisionSerializer,
     RiskDependencySerializer,
+    SuggestionRequestSerializer,
+    SuggestionSerializer,
 )
 from .services import (
     approve_revision,
@@ -385,9 +394,7 @@ class DependencyViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = RiskDependency.objects.select_related(
-        "revision", "source_item", "target_item"
-    )
+    queryset = RiskDependency.objects.select_related("revision", "source_item", "target_item")
     serializer_class = RiskDependencySerializer
     filterset_fields = ("revision", "source_item", "target_item", "relation_type")
     ordering = ("revision_id", "id")
@@ -430,9 +437,7 @@ class AttachmentViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = Attachment.objects.select_related(
-        "product", "revision", "item", "uploaded_by"
-    )
+    queryset = Attachment.objects.select_related("product", "revision", "item", "uploaded_by")
     serializer_class = AttachmentSerializer
     filterset_fields = ("product", "revision", "item")
     search_fields = ("original_name",)
@@ -473,3 +478,75 @@ class AttachmentViewSet(
         attachment = self.get_object()
         url = get_download_url(attachment.file)
         return Response({"url": url, "expires_in": 3600})
+
+
+@extend_schema_view(
+    list=extend_schema(
+        tags=["LLM-подсказки"],
+        summary="Список подсказок",
+        description="Предложения формируются демонстрационной заглушкой, не реальной языковой моделью.",
+    ),
+    retrieve=extend_schema(tags=["LLM-подсказки"], summary="Подсказка"),
+    create=extend_schema(
+        tags=["LLM-подсказки"],
+        summary="Запросить подсказку",
+        description="Возвращает предложение заглушки; на FMEA оно не влияет до явного применения.",
+        request=SuggestionRequestSerializer,
+        responses={201: SuggestionSerializer},
+    ),
+    apply=extend_schema(
+        tags=["LLM-подсказки"],
+        summary="Применить подсказку",
+        responses={200: FMEAItemSerializer},
+    ),
+    reject=extend_schema(
+        tags=["LLM-подсказки"],
+        summary="Отклонить подсказку",
+        responses={200: SuggestionSerializer},
+    ),
+)
+class SuggestionViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
+    queryset = LLMSuggestion.objects.select_related(
+        "product", "revision", "component", "created_by", "applied_item"
+    )
+    serializer_class = SuggestionSerializer
+    filterset_fields = ("product", "revision", "component", "status", "provider")
+    search_fields = ("prompt", "component__code", "component__name")
+    ordering = ("-created_at",)
+    permission_classes = (IsAuthenticated,)
+
+    def get_permissions(self):
+        if self.action in ("create", "apply", "reject"):
+            return [IsEngineerOrAbove()]
+        return [IsAuthenticated()]
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return SuggestionRequestSerializer
+        return SuggestionSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        suggestion = serializer.save()
+        output = SuggestionSerializer(suggestion, context=self.get_serializer_context())
+        headers = self.get_success_headers(output.data)
+        return Response(output.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    @action(detail=True, methods=["post"])
+    def apply(self, request, pk=None):
+        suggestion = self.get_object()
+        item = apply_suggestion(suggestion, user=request.user, request=request)
+        output = FMEAItemSerializer(item, context=self.get_serializer_context())
+        return Response(output.data)
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        suggestion = self.get_object()
+        suggestion = reject_suggestion(suggestion, user=request.user, request=request)
+        return Response(self.get_serializer(suggestion).data)

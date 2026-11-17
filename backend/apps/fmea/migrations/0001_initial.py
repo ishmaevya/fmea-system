@@ -7,7 +7,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -43,9 +42,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "ip_address",
-                    models.GenericIPAddressField(
-                        blank=True, null=True, verbose_name="IP-адрес"
-                    ),
+                    models.GenericIPAddressField(blank=True, null=True, verbose_name="IP-адрес"),
                 ),
                 (
                     "created_at",
@@ -102,9 +99,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "approved_at",
-                    models.DateTimeField(
-                        blank=True, null=True, verbose_name="Дата утверждения"
-                    ),
+                    models.DateTimeField(blank=True, null=True, verbose_name="Дата утверждения"),
                 ),
                 (
                     "created_at",
@@ -420,9 +415,7 @@ class Migration(migrations.Migration):
                 ("response", models.JSONField(verbose_name="Ответ")),
                 (
                     "provider",
-                    models.CharField(
-                        default="stub", max_length=50, verbose_name="Провайдер"
-                    ),
+                    models.CharField(default="stub", max_length=50, verbose_name="Провайдер"),
                 ),
                 (
                     "model_name",

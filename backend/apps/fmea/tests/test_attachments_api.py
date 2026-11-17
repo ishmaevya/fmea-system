@@ -11,17 +11,13 @@ from apps.fmea.models import Attachment, RevisionStatus
 def in_memory_storage(settings):
     settings.STORAGES = {
         "default": {"BACKEND": "django.core.files.storage.InMemoryStorage"},
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
-        },
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
     }
 
 
 def upload(api_client, user, **target):
     api_client.force_authenticate(user)
-    file = SimpleUploadedFile(
-        "protocol.pdf", b"%PDF-1.4 demo", content_type="application/pdf"
-    )
+    file = SimpleUploadedFile("protocol.pdf", b"%PDF-1.4 demo", content_type="application/pdf")
     payload = {"file": file, **{key: value.pk for key, value in target.items()}}
     return api_client.post("/api/attachments/", payload, format="multipart")
 
@@ -49,9 +45,7 @@ def test_upload_requires_exactly_one_target(api_client, engineer, product, revis
     api_client.force_authenticate(engineer)
     file = SimpleUploadedFile("a.pdf", b"%PDF", content_type="application/pdf")
 
-    no_target = api_client.post(
-        "/api/attachments/", {"file": file}, format="multipart"
-    )
+    no_target = api_client.post("/api/attachments/", {"file": file}, format="multipart")
     assert no_target.status_code == 400
     assert "target" in no_target.json()
 
@@ -113,9 +107,7 @@ def test_approved_revision_is_read_only(api_client, quality, revision):
 
 
 @pytest.mark.django_db
-def test_delete_requires_author_or_quality(
-    api_client, engineer, quality, product
-):
+def test_delete_requires_author_or_quality(api_client, engineer, quality, product):
     created = upload(api_client, engineer, product=product)
     assert created.status_code == 201
     attachment_id = created.json()["id"]
@@ -141,9 +133,7 @@ def test_delete_requires_author_or_quality(
 
 
 @pytest.mark.django_db
-def test_approved_revision_attachment_cannot_be_deleted(
-    api_client, engineer, quality, revision
-):
+def test_approved_revision_attachment_cannot_be_deleted(api_client, engineer, quality, revision):
     created = upload(api_client, engineer, revision=revision)
     assert created.status_code == 201
     attachment_id = created.json()["id"]

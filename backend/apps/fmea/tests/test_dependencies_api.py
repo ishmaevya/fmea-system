@@ -57,14 +57,10 @@ def test_dependency_validation(api_client, engineer, revision, component, item_f
 
 
 @pytest.mark.django_db
-def test_duplicate_dependency_rejected(
-    api_client, engineer, revision, component, item_factory
-):
+def test_duplicate_dependency_rejected(api_client, engineer, revision, component, item_factory):
     source = item_factory(revision, component, failure_mode="Источник")
     target = item_factory(revision, component, failure_mode="Цель")
-    revision.dependencies.create(
-        source_item=source, target_item=target, relation_type="causes"
-    )
+    revision.dependencies.create(source_item=source, target_item=target, relation_type="causes")
     api_client.force_authenticate(engineer)
 
     response = api_client.post(
@@ -77,9 +73,7 @@ def test_duplicate_dependency_rejected(
 
 
 @pytest.mark.django_db
-def test_dependency_permissions(
-    api_client, engineer, quality, revision, component, item_factory
-):
+def test_dependency_permissions(api_client, engineer, quality, revision, component, item_factory):
     source = item_factory(revision, component, failure_mode="Источник")
     target = item_factory(revision, component, failure_mode="Цель")
     revision.status = RevisionStatus.REVIEW
@@ -97,16 +91,12 @@ def test_dependency_permissions(
     assert forbidden.status_code == 403
 
     api_client.force_authenticate(quality)
-    allowed = api_client.post(
-        f"/api/revisions/{revision.pk}/dependencies/", payload, format="json"
-    )
+    allowed = api_client.post(f"/api/revisions/{revision.pk}/dependencies/", payload, format="json")
     assert allowed.status_code == 201
 
 
 @pytest.mark.django_db
-def test_dependency_delete_rules(
-    api_client, engineer, quality, revision, component, item_factory
-):
+def test_dependency_delete_rules(api_client, engineer, quality, revision, component, item_factory):
     source = item_factory(revision, component, failure_mode="Источник")
     target = item_factory(revision, component, failure_mode="Цель")
     dependency = revision.dependencies.create(
@@ -128,14 +118,10 @@ def test_dependency_delete_rules(
 
 
 @pytest.mark.django_db
-def test_dependencies_list_nested(
-    api_client, engineer, revision, component, item_factory
-):
+def test_dependencies_list_nested(api_client, engineer, revision, component, item_factory):
     source = item_factory(revision, component, failure_mode="Источник")
     target = item_factory(revision, component, failure_mode="Цель")
-    revision.dependencies.create(
-        source_item=source, target_item=target, relation_type="causes"
-    )
+    revision.dependencies.create(source_item=source, target_item=target, relation_type="causes")
     api_client.force_authenticate(engineer)
 
     response = api_client.get(f"/api/revisions/{revision.pk}/dependencies/")

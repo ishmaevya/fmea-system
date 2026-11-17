@@ -54,9 +54,7 @@ def test_create_item_validates_scores_and_component(api_client, engineer, revisi
         "detection": 3,
     }
 
-    invalid_score = api_client.post(
-        f"/api/revisions/{revision.pk}/items/", payload, format="json"
-    )
+    invalid_score = api_client.post(f"/api/revisions/{revision.pk}/items/", payload, format="json")
     assert invalid_score.status_code == 400
     assert "severity" in invalid_score.json()
 
@@ -96,9 +94,7 @@ def test_update_item_recomputes_rpn(api_client, engineer, revision, component, i
     item = item_factory(revision, component)
     api_client.force_authenticate(engineer)
 
-    response = api_client.patch(
-        f"/api/items/{item.pk}/", {"severity": 10}, format="json"
-    )
+    response = api_client.patch(f"/api/items/{item.pk}/", {"severity": 10}, format="json")
 
     assert response.status_code == 200
     payload = response.json()
@@ -136,15 +132,16 @@ def test_review_edits_require_quality(
 
 
 @pytest.mark.django_db
-def test_approved_revision_is_read_only(
-    api_client, quality, revision, component, item_factory
-):
+def test_approved_revision_is_read_only(api_client, quality, revision, component, item_factory):
     revision.status = RevisionStatus.APPROVED
     revision.save(update_fields=["status"])
     item = item_factory(revision, component)
     api_client.force_authenticate(quality)
 
-    assert api_client.patch(f"/api/items/{item.pk}/", {"severity": 10}, format="json").status_code == 403
+    assert (
+        api_client.patch(f"/api/items/{item.pk}/", {"severity": 10}, format="json").status_code
+        == 403
+    )
     assert api_client.delete(f"/api/items/{item.pk}/").status_code == 403
     assert (
         api_client.post(
@@ -288,14 +285,10 @@ def test_bulk_rejects_foreign_and_missing_ids(
 
 
 @pytest.mark.django_db
-def test_graph_returns_nodes_and_edges(
-    api_client, engineer, revision, component, item_factory
-):
+def test_graph_returns_nodes_and_edges(api_client, engineer, revision, component, item_factory):
     first = item_factory(revision, component, failure_mode="Первый")
     second = item_factory(revision, component, failure_mode="Второй")
-    revision.dependencies.create(
-        source_item=second, target_item=first, relation_type="causes"
-    )
+    revision.dependencies.create(source_item=second, target_item=first, relation_type="causes")
     api_client.force_authenticate(engineer)
 
     response = api_client.get(f"/api/revisions/{revision.pk}/graph/")
