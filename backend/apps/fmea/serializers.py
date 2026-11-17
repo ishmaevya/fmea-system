@@ -509,3 +509,56 @@ class SuggestionSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = fields
+
+
+class ReportQuerySerializer(serializers.Serializer):
+    limit = serializers.IntegerField(min_value=1, max_value=100, required=False, default=10)
+
+
+class ReportRevisionSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    product = serializers.IntegerField()
+    product_code = serializers.CharField()
+    product_name = serializers.CharField()
+    variant_code = serializers.CharField(allow_null=True)
+    version = serializers.CharField()
+    status = serializers.CharField()
+    status_display = serializers.CharField()
+
+
+class ReportSummarySerializer(serializers.Serializer):
+    items_count = serializers.IntegerField()
+    components_count = serializers.IntegerField()
+    avg_rpn = serializers.FloatField()
+    max_rpn = serializers.IntegerField()
+    counts_by_priority = serializers.DictField(child=serializers.IntegerField())
+    counts_by_status = serializers.DictField(child=serializers.IntegerField())
+
+
+class TopRiskSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    component_id = serializers.IntegerField()
+    component_code = serializers.CharField()
+    component_name = serializers.CharField()
+    failure_mode = serializers.CharField()
+    failure_cause = serializers.CharField()
+    failure_effect = serializers.CharField()
+    severity = serializers.IntegerField()
+    occurrence = serializers.IntegerField()
+    detection = serializers.IntegerField()
+    rpn = serializers.IntegerField()
+    action_priority = serializers.CharField()
+    action_priority_display = serializers.CharField()
+    recommended_action = serializers.CharField()
+    responsible_email = serializers.CharField(allow_null=True)
+    due_date = serializers.DateField(allow_null=True)
+    status = serializers.CharField()
+    status_display = serializers.CharField()
+    source = serializers.CharField()
+
+
+class RevisionReportSerializer(serializers.Serializer):
+    revision = ReportRevisionSerializer()
+    summary = ReportSummarySerializer()
+    top_risks = TopRiskSerializer(many=True)
+    generated_at = serializers.DateTimeField()

@@ -1,5 +1,11 @@
 from django.db import transaction
-from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
+from django.http import HttpResponse
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -18,6 +24,7 @@ from .models import (
     LLMSuggestion,
     RiskDependency,
 )
+from .reports import build_report, build_xlsx
 from .serializers import (
     AttachmentSerializer,
     AttachmentUploadSerializer,
@@ -25,8 +32,10 @@ from .serializers import (
     CloneRevisionSerializer,
     FMEAItemSerializer,
     RejectRevisionSerializer,
+    ReportQuerySerializer,
     RevisionCreateSerializer,
     RevisionGraphSerializer,
+    RevisionReportSerializer,
     RevisionSerializer,
     RiskDependencySerializer,
     SuggestionRequestSerializer,
@@ -320,6 +329,66 @@ class RevisionViewSet(
 
         queryset = revision.dependencies.select_related("source_item", "target_item")
         return self.paginated_items(queryset, RiskDependencySerializer)
+
+    def report_limit(self, request) -> int:
+        serializer = ReportQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        return serializer.validated_data["limit"]
+
+    @extend_schema(
+        tags=["Отчёты"],
+        summary="Сводный отчёт и топ рисков",
+        parameters=[
+            OpenApiParameter(
+                name="limit",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Количество пунктов в топе рисков (1–100)",
+            )
+        ],
+        responses={200: RevisionReportSerializer},
+    )
+    @action(detail=True, methods=["get"], url_path="report")
+    def report(self, request, pk=None):
+        revision = self.get_object()
+        data = build_report(revision, limit=self.report_limit(request))
+        return Response(data)
+
+    @extend_schema(
+        tags=["Отчёты"],
+        summary="Экспорт отчёта в XLSX",
+        parameters=[
+            OpenApiParameter(
+                name="limit",
+                type=int,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Количество пунктов в топе рисков (1–100)",
+            )
+        ],
+        responses={200: OpenApiResponse(description="XLSX-файл")},
+    )
+    @action(detail=True, methods=["get"], url_path="report/xlsx")
+    def report_xlsx(self, request, pk=None):
+        revision = self.get_object()
+        limit = self.report_limit(request)
+        report = build_report(revision, limit=limit)
+        content = build_xlsx(report)
+        log_action(
+            user=request.user,
+            action="export",
+            entity=revision,
+            payload={"format": "xlsx", "limit": limit},
+            request=request,
+        )
+        response = HttpResponse(
+            content.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        filename = f"fmea-report-{revision.product.code}-{revision.version}.xlsx"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
 
 @extend_schema_view(
