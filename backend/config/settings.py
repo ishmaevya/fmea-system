@@ -160,6 +160,7 @@ else:
     }
 
 USE_S3 = env.bool("USE_S3", default=False)
+MINIO_PUBLIC_ENDPOINT = env("MINIO_PUBLIC_ENDPOINT", default="")
 if USE_S3:
     STORAGES = {
         "default": {
@@ -173,6 +174,7 @@ if USE_S3:
                 "default_acl": None,
                 "file_overwrite": False,
                 "querystring_auth": True,
+                "querystring_expire": 3600,
                 "addressing_style": "path",
             },
         },
@@ -212,6 +214,11 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "API системы анализа видов и последствий отказов медицинских изделий.",
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    "ENUM_NAME_OVERRIDES": {
+        "ProductStatusEnum": "apps.catalog.models.ProductStatus",
+        "RevisionStatusEnum": "apps.fmea.models.RevisionStatus",
+        "ItemStatusEnum": "apps.fmea.models.ItemStatus",
+    },
 }
 
 LOGGING = {

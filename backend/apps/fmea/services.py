@@ -1,8 +1,9 @@
 from django.db import IntegrityError, transaction
 from django.utils import timezone
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.accounts.models import User
+from apps.accounts.permissions import is_quality_or_admin
 from apps.catalog.models import MedicalProduct, ProductVariant
 
 from .audit import log_action
@@ -36,6 +37,15 @@ def _ensure_status(revision: FMEARevision, *allowed: str) -> None:
                     f"Допустимо: {allowed_titles}"
                 )
             }
+        )
+
+
+def ensure_revision_editable(revision: FMEARevision, user: User) -> None:
+    if revision.status in (RevisionStatus.APPROVED, RevisionStatus.ARCHIVED):
+        raise PermissionDenied("Утверждённая или архивная ревизия доступна только для чтения")
+    if revision.status == RevisionStatus.REVIEW and not is_quality_or_admin(user):
+        raise PermissionDenied(
+            "На этапе проверки правки доступны менеджеру по качеству или администратору"
         )
 
 
@@ -101,9 +111,7 @@ def clone_revision(
     change_reason: str = "",
     request=None,
 ) -> FMEARevision:
-    _ensure_status(
-        source, RevisionStatus.DRAFT, RevisionStatus.REVIEW, RevisionStatus.APPROVED
-    )
+    _ensure_status(source, RevisionStatus.DRAFT, RevisionStatus.REVIEW, RevisionStatus.APPROVED)
 
     target = create_revision(
         product=source.product,
@@ -181,9 +189,7 @@ def _validate_items(revision: FMEARevision) -> None:
     invalid = []
     for item in revision.items.all():
         blank = not (
-            item.failure_mode.strip()
-            and item.failure_cause.strip()
-            and item.failure_effect.strip()
+            item.failure_mode.strip() and item.failure_cause.strip() and item.failure_effect.strip()
         )
         out_of_range = not all(
             1 <= value <= 10 for value in (item.severity, item.occurrence, item.detection)

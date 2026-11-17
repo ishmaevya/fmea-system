@@ -16,9 +16,13 @@ class PaginatedActionMixin:
     def paginated_response(self, queryset, serializer_class, context=None):
         page = self.paginate_queryset(queryset)
         if page is not None:
-            serializer = serializer_class(page, many=True, context=context or self.get_serializer_context())
+            serializer = serializer_class(
+                page, many=True, context=context or self.get_serializer_context()
+            )
             return self.get_paginated_response(serializer.data)
-        serializer = serializer_class(queryset, many=True, context=context or self.get_serializer_context())
+        serializer = serializer_class(
+            queryset, many=True, context=context or self.get_serializer_context()
+        )
         return Response(serializer.data)
 
 

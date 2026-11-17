@@ -132,9 +132,7 @@ def test_revision_variant_must_match_product(api_client, engineer, product):
     other = MedicalProduct.objects.create(
         code="HUM-999", name="Другое изделие", manufacturer="", created_by=engineer
     )
-    alien_variant = ProductVariant.objects.create(
-        product=other, code="V-01", name="Исполнение 1"
-    )
+    alien_variant = ProductVariant.objects.create(product=other, code="V-01", name="Исполнение 1")
     api_client.force_authenticate(engineer)
 
     response = api_client.post(

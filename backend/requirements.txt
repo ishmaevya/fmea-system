@@ -10,6 +10,7 @@ django-redis>=5.4,<6
 django-storages[s3]>=1.14,<2
 boto3>=1.36,<2
 Pillow>=11,<12
+openpyxl>=3.1,<4
 gunicorn>=23,<24
 pytest>=8.3,<9
 pytest-django>=4.9,<5

@@ -204,7 +204,9 @@ class FMEAItem(models.Model):
         super().clean()
         if self.component_id and self.revision_id:
             if self.component.product_id != self.revision.product_id:
-                raise ValidationError("Компонент должен принадлежать тому же изделию, что и ревизия")
+                raise ValidationError(
+                    "Компонент должен принадлежать тому же изделию, что и ревизия"
+                )
 
 
 class RiskDependency(models.Model):
@@ -246,7 +248,9 @@ class RiskDependency(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.source_item_id} -> {self.target_item_id} [{self.get_relation_type_display()}]"
+        return (
+            f"{self.source_item_id} -> {self.target_item_id} [{self.get_relation_type_display()}]"
+        )
 
 
 class Attachment(models.Model):
@@ -373,4 +377,6 @@ class AuditLog(models.Model):
         ordering = ("-created_at",)
 
     def __str__(self):
-        return f"{self.action} {self.entity_type}#{self.entity_id} [{self.created_at:%Y-%m-%d %H:%M}]"
+        return (
+            f"{self.action} {self.entity_type}#{self.entity_id} [{self.created_at:%Y-%m-%d %H:%M}]"
+        )
