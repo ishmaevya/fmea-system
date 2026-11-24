@@ -41,10 +41,7 @@ class IsQualityOrAdmin(BasePermission):
 
 
 class IsEngineerOrAbove(BasePermission):
-    message = (
-        "Действие доступно инженеру-конструктору, менеджеру по качеству "
-        "или администратору"
-    )
+    message = "Действие доступно инженеру-конструктору, менеджеру по качеству или администратору"
 
     def has_permission(self, request, view):
         return is_engineer_or_above(request.user)

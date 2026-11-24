@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -28,9 +27,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "code",
-                    models.CharField(
-                        max_length=100, unique=True, verbose_name="Обозначение"
-                    ),
+                    models.CharField(max_length=100, unique=True, verbose_name="Обозначение"),
                 ),
                 ("name", models.CharField(max_length=255, verbose_name="Наименование")),
                 (
@@ -39,9 +36,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "tu_code",
-                    models.CharField(
-                        blank=True, max_length=100, verbose_name="Обозначение ТУ"
-                    ),
+                    models.CharField(blank=True, max_length=100, verbose_name="Обозначение ТУ"),
                 ),
                 ("description", models.TextField(blank=True, verbose_name="Описание")),
                 (
@@ -91,22 +86,16 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "code",
-                    models.CharField(
-                        max_length=100, verbose_name="Обозначение исполнения"
-                    ),
+                    models.CharField(max_length=100, verbose_name="Обозначение исполнения"),
                 ),
                 ("name", models.CharField(max_length=255, verbose_name="Наименование")),
                 (
                     "settings",
-                    models.JSONField(
-                        blank=True, default=dict, verbose_name="Параметры"
-                    ),
+                    models.JSONField(blank=True, default=dict, verbose_name="Параметры"),
                 ),
                 (
                     "is_default",
-                    models.BooleanField(
-                        default=False, verbose_name="Исполнение по умолчанию"
-                    ),
+                    models.BooleanField(default=False, verbose_name="Исполнение по умолчанию"),
                 ),
                 (
                     "created_at",

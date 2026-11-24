@@ -20,6 +20,14 @@ class ProductVariantAdmin(admin.ModelAdmin):
 
 @admin.register(Component)
 class ComponentAdmin(admin.ModelAdmin):
-    list_display = ("product", "code", "name", "component_type", "criticality", "parent", "is_active")
+    list_display = (
+        "product",
+        "code",
+        "name",
+        "component_type",
+        "criticality",
+        "parent",
+        "is_active",
+    )
     list_filter = ("product", "criticality", "is_active")
     search_fields = ("code", "name")
