@@ -66,17 +66,16 @@ erDiagram
 | `id` | bigint | PK | Идентификатор |
 | `email` | varchar(254) | unique, not null | Логин |
 | `password` | varchar(128) | not null | Хеш пароля |
-| `full_name` | varchar(255) | not null | ФИО |
+| `full_name` | varchar(255) | blank | ФИО |
 | `role` | enum `Role` | not null, default `engineer` | Роль |
 | `position` | varchar(255) | blank | Должность |
 | `is_active` | boolean | default true | Активность |
 | `last_login` | timestamptz | null | Последний вход |
-| `created_at` | timestamptz | auto | Создан |
 
 Правила:
 - email приводится к нижнему регистру и уникален без учёта регистра.
-- Пользователь с утверждёнными ревизиями не удаляется, а деактивируется.
-- Смена роли доступна только администратору.
+- Пользователи создаются и деактивируются в Django admin; отдельный users API не входит в MVP.
+- Смена роли доступна администратору через Django admin.
 
 ### 4.2 MedicalProduct
 
@@ -85,9 +84,9 @@ erDiagram
 | Поле | Тип | Ограничения | Описание |
 |---|---|---|---|
 | `id` | bigint | PK | Идентификатор |
-| `code` | varchar(100) | unique, not null | Обозначение, например `АМНК.941629.001ТУ` |
+| `code` | varchar(100) | unique, not null | Обозначение, например `HUM-001` |
 | `name` | varchar(255) | not null | Наименование |
-| `manufacturer` | varchar(255) | not null | Изготовитель |
+| `manufacturer` | varchar(255) | blank | Изготовитель; в демо-данных пусто |
 | `tu_code` | varchar(100) | blank | Обозначение ТУ |
 | `description` | text | blank | Назначение и особенности |
 | `status` | enum `ProductStatus` | default `active` | Статус |
@@ -121,14 +120,10 @@ erDiagram
 ```json
 {
   "output_temperature_c": [28, 38],
-  "heater_temperature_c": null,
   "humidity_percent": [50, 75, 100],
   "flow_l_min": [2, 50],
   "warmup_min": 20,
-  "mtbf_h": 2000,
   "chamber_volume_ml": 150,
-  "leak_ml_min_at_80_pa": 10,
-  "power_w": 210,
   "ip_rating": "IPX1"
 }
 ```
@@ -153,7 +148,7 @@ erDiagram
 | `updated_at` | timestamptz | auto | Изменён |
 
 Ограничения:
-- `unique(product_id, variant_id, code)` с `NULLS NOT DISTINCT` (PostgreSQL 15+).
+- `unique(product, variant, code)`; для демо-компонентов `variant` не заполняется.
 - `parent_id != id`.
 - Родитель принадлежит тому же изделию.
 - Удаление запрещено, если есть `FMEAItem`; используется архивирование.
@@ -169,7 +164,7 @@ erDiagram
 | `variant_id` | FK `ProductVariant` | null, set null | Исполнение |
 | `version` | varchar(20) | not null | Версия, например `1.0` |
 | `status` | enum `RevisionStatus` | default `draft` | Статус |
-| `based_on_id` | FK `FMEARevision` | null, set null | Ревизия-основа |
+| `based_on` | FK `FMEARevision` | null, set null | Ревизия-основа |
 | `change_reason` | text | blank | Причина изменения |
 | `created_by` | FK `User` | not null, protect | Автор |
 | `approved_by` | FK `User` | null, protect | Утвердивший |
@@ -178,7 +173,7 @@ erDiagram
 | `updated_at` | timestamptz | auto | Изменена |
 
 Ограничения:
-- `unique(product_id, variant_id, version)` с `NULLS NOT DISTINCT`.
+- `unique(product, variant, version)`.
 - `approved_by` и `approved_at` заполняются одновременно.
 - `based_on_id` не может ссылаться на саму ревизию.
 
@@ -200,8 +195,7 @@ draft --submit--> review --approve--> approved --archive--> archived
 
 Правила:
 - В `approved` ревизия доступна только для чтения.
-- Новая ревизия создаётся клонированием предыдущей; пункты, компоненты и связи копируются.
-- Одновременно у изделия может быть несколько черновиков, но только одна утверждённая ревизия на исполнение.
+- Новая ревизия создаётся клонированием предыдущей; пункты и связи копируются.
 
 ### 4.6 FMEAItem
 
@@ -218,19 +212,20 @@ draft --submit--> review --approve--> approved --archive--> archived
 | `severity` | smallint | 1–10 | S |
 | `occurrence` | smallint | 1–10 | O |
 | `detection` | smallint | 1–10 | D |
-| `rpn` | integer | generated | `S × O × D` |
+| `rpn` | integer | вычисляется в `save()` | `S × O × D` |
 | `action_priority` | enum `ActionPriority` | not null | Приоритет действий |
 | `recommended_action` | text | blank | Рекомендуемое действие |
 | `responsible_id` | FK `User` | null, set null | Ответственный |
 | `due_date` | date | null | Срок |
 | `status` | enum `ItemStatus` | default `open` | Статус |
 | `source` | enum `ItemSource` | default `manual` | Источник |
+| `source_reference` | varchar(255) | blank | Ссылка на источник; для LLM — `Демонстрационная LLM-заглушка` |
 | `created_by` | FK `User` | not null, protect | Автор |
 | `created_at` | timestamptz | auto | Создан |
 | `updated_at` | timestamptz | auto | Изменён |
 
 Правила:
-- `rpn` — генерируемое поле `severity * occurrence * detection`; вручную не редактируется.
+- `rpn` — вычисляется как `severity * occurrence * detection` при сохранении; вручную не редактируется.
 - `action_priority` пересчитывается при изменении S/O/D.
 - Компонент должен принадлежать изделию ревизии.
 - В ревизии `approved` пункт доступен только для чтения.
@@ -306,18 +301,19 @@ draft --submit--> review --approve--> approved --archive--> archived
 Формат `response`:
 ```json
 {
+  "disclaimer": "Демонстрационная заглушка на правилах, не реальная языковая модель.",
   "suggestions": [
     {
-      "failure_mode": "Перегрев дыхательной смеси",
-      "failure_cause": "Отказ датчика температуры",
-      "failure_effect": "Ожог дыхательных путей пациента",
-      "severity": 9,
+      "failure_mode": "Отказ компонента HEATER",
+      "failure_cause": "Потенциальный дефект или износ элемента HEATER",
+      "failure_effect": "Нарушение функции компонента HEATER в составе изделия",
+      "severity": 7,
       "occurrence": 4,
       "detection": 5,
-      "recommended_action": "Проверить датчик и цепь контроля температуры"
+      "recommended_action": "Проверить проектную документацию и добавить контроль параметра",
+      "source_reference": "Демонстрационная LLM-заглушка"
     }
-  ],
-  "disclaimer": "Предложение сгенерировано автоматически и требует проверки инженером"
+  ]
 }
 ```
 
@@ -335,7 +331,7 @@ draft --submit--> review --approve--> approved --archive--> archived
 |---|---|---|---|
 | `id` | bigint | PK | Идентификатор |
 | `user_id` | FK `User` | null, set null | Пользователь |
-| `action` | varchar(50) | not null | `create`, `update`, `delete`, `approve`, `apply_llm`, `login` |
+| `action` | varchar(50) | not null | `create`, `update`, `delete`, `archive`, `clone`, `submit`, `approve`, `reject`, `bulk_update`, `upload`, `export`, `request`, `apply` |
 | `entity_type` | varchar(50) | not null | Имя сущности |
 | `entity_id` | varchar(50) | not null | Идентификатор |
 | `payload` | jsonb | default `{}` | Изменённые поля без секретов |
@@ -358,7 +354,6 @@ RPN = S × O × D
 
 | Условие | Приоритет |
 |---|---|
-| `S >= 9` | `critical` |
 | `RPN >= 250` | `critical` |
 | `126 <= RPN < 250` | `high` |
 | `51 <= RPN < 126` | `medium` |
@@ -387,11 +382,11 @@ RPN = S × O × D
 | Удаление пункта FMEA в черновике | да | да | да |
 | Запрос LLM-подсказки | да | да | да |
 | Применение LLM-подсказки | да | да | да |
-| Отклонение LLM-подсказки | да | да | да |
+| Отклонение LLM-подсказки | да (автор) | да | да |
 | Просмотр отчётов | да | да | да |
 | Экспорт отчётов | да | да | да |
 | Управление пользователями | нет | нет | да |
-| Просмотр аудита | нет | да | да |
+| Просмотр аудита | нет | нет | да |
 
 ## 7. Инварианты и бизнес-правила
 
@@ -399,68 +394,68 @@ RPN = S × O × D
 2. В утверждённой ревизии запрещены любые изменения, кроме архивирования.
 3. RPN не хранится в пользовательском вводе и всегда вычисляется.
 4. Связь не может соединять пункт с самим собой или пункты разных ревизий.
-5. Удаление изделия с ревизиями запрещено; допускается архивирование.
-6. Удаление компонента с пунктами FMEA запрещено; допускается архивирование.
+5. Изделие не удаляется физически через API: оно переводится в `archived`.
+6. Компонент не удаляется физически через API: он деактивируется (`is_active=false`).
 7. Вложение имеет ровно одного владельца: изделие, ревизию или пункт.
 8. LLM-предложение не влияет на FMEA без явного применения пользователем.
-9. Все изменения утверждённой ревизии фиксируются в аудите.
-10. Дата утверждения не может быть раньше даты создания ревизии.
+9. Ключевые действия (создание, изменение, утверждение, экспорт) фиксируются в аудите без секретов.
+10. Редактирование возможно только в ревизиях `draft` и `review`; в `review` правки доступны quality/admin.
 
-## 8. Индексы
+## 8. Ограничения и поля фильтрации
 
-| Таблица | Индекс | Назначение |
+| Таблица | Ограничение или поле | Назначение |
 |---|---|---|
-| `Component` | `(product_id, parent_id)` | Дерево компонентов |
-| `FMEARevision` | `(product_id, variant_id, status)` | Список ревизий |
-| `FMEAItem` | `(revision_id, rpn DESC)` | Топ рисков |
-| `FMEAItem` | `(revision_id, component_id)` | Фильтр по компоненту |
-| `FMEAItem` | `(revision_id, action_priority)` | Фильтр по приоритету |
-| `RiskDependency` | `(revision_id, source_item_id)` | Исходящие связи |
-| `RiskDependency` | `(revision_id, target_item_id)` | Входящие связи |
-| `LLMSuggestion` | `(component_id, created_at DESC)` | История подсказок |
-| `AuditLog` | `(entity_type, entity_id, created_at DESC)` | История сущности |
+| `MedicalProduct` | `unique(code)` | Уникальное обозначение изделия |
+| `ProductVariant` | `unique(product, code)` | Уникальное обозначение исполнения |
+| `Component` | `unique(product, variant, code)` | Уникальный код компонента |
+| `FMEARevision` | `unique(product, variant, version)` | Уникальная версия ревизии |
+| `RiskDependency` | `unique(revision, source_item, target_item, relation_type)` | Защита от дублей связей |
+| `FMEAItem` | `revision`, `component`, `status`, `source`, `action_priority`, `rpn` | Фильтры и сортировка таблицы |
+| `LLMSuggestion` | `component`, `status`, `provider` | История подсказок |
+| `AuditLog` | `user`, `action`, `entity_type`, `entity_id`, `created_at` | Фильтры журнала |
 
 ## 9. Справочник компонентов для seed
 
+Демонстрационный набор не содержит реальных обозначений и воспроизведён в обобщённом виде.
+
 | Код | Компонент | Тип | Критичность |
 |---|---|---|---|
-| `BU` | Блок управления 3703.01100000(-01) | Электронный | critical |
+| `BU` | Блок управления | Электронный | critical |
 | `PANEL` | Панель индикации и управления | Электронный | high |
-| `HEATER` | Нагреватель воды (плитка) | Электрический | critical |
-| `THERMOSTAT` | Термостат защиты от перегрева 85 °C | Электрический | critical |
-| `SENSOR_TH` | Датчик температуры/влажности 3703.41000000 | Электронный | critical |
-| `CHAMBER` | Камера увлажнителя 3703.20000501 | Механический | high |
+| `HEATER` | Нагреватель воды | Электрический | critical |
+| `THERMOSTAT` | Термостат защиты | Электрический | critical |
+| `SENSOR_TH` | Датчик температуры/влажности | Электронный | critical |
+| `SENSOR_CONN` | Разъём датчика | Электрический | medium |
+| `CHAMBER` | Камера увлажнителя | Механический | high |
 | `CHAMBER_BASE` | Основание камеры | Механический | high |
-| `PORTS` | Входной и выходной патрубки | Механический | medium |
 | `AUTOFILL` | Система автозаполнения | Механический | medium |
-| `POWER_BTN` | Кнопка включения | Электрический | low |
-| `LIMIT_BTN` | Кнопка-ограничитель | Механический | low |
 | `POWER_CABLE` | Кабель питания | Электрический | high |
-| `SENSOR_CONN` | Разъём датчика температуры/влажности | Электрический | medium |
-| `HEATER_ADAPTER` | Адаптер нагревательного провода 3703.02000000 / 3703.02100000 | Электрический | medium |
-| `BRACKET` | Кронштейн 3150.17000000 | Механический | low |
-| `THERMOMETER` | Термометр 3703.01500000-01 | Механический | low |
-| `CIRCUIT` | Дыхательный контур с обогревом | Аксессуар | high |
+| `HEATER_ADAPTER` | Адаптер нагревательного провода | Электрический | medium |
+| `CIRCUIT` | Дыхательный контур | Аксессуар | high |
+| `BRACKET` | Кронштейн | Механический | low |
+| `THERMOMETER` | Термометр | Механический | low |
 | `VENTS` | Вентиляционные отверстия | Механический | medium |
 | `HOUSING` | Корпус | Механический | low |
-| `TEST_CONN` | Разъём «Тест» | Электрический | low |
+| `LIMIT_BTN` | Кнопка-ограничитель | Механический | low |
+| `POWER_BTN` | Кнопка включения | Электрический | low |
+| `TEST_CONN` | Разъём для тестирования | Электрический | low |
 
-## 10. Аварийные коды изделия
+## 10. Демонстрационные коды отказов
 
-| Код | Причина по РЭ | Последствие | Связанные компоненты |
+| Код | Условная причина | Последствие | Связанные компоненты |
 |---|---|---|---|
-| `E1` | Перегрев дыхательной смеси 39–41 °C; перегрев нагревательного элемента | Ожог дыхательных путей, повреждение контура | `HEATER`, `SENSOR_TH`, `THERMOSTAT` |
-| `E2` | Нет потока; неисправен нагреватель; датчик не установлен; неисправен нагревательный элемент | Отсутствие увлажнения, перегрев, отказ терапии | `HEATER`, `SENSOR_TH`, `CIRCUIT` |
-| `E3` | Разрыв цепи датчика температуры/влажности; разрыв цепи датчика температуры | Некорректное управление температурой, риск перегрева | `SENSOR_TH`, `SENSOR_CONN` |
-| `HUM` | Влажность не достигает уровня; нет воды в камере | Сухость дыхательной смеси, повреждение слизистой | `CHAMBER`, `AUTOFILL`, `HEATER` |
+| `E1` | Превышение температуры, перегрев нагревательного элемента | Перегрев, повреждение контура | `HEATER`, `SENSOR_TH`, `THERMOSTAT` |
+| `E2` | Нет потока, неисправен нагреватель или датчик | Отсутствие увлажнения, отказ терапии | `HEATER`, `SENSOR_TH`, `CIRCUIT` |
+| `E3` | Разрыв цепи датчика | Некорректное управление температурой | `SENSOR_TH`, `SENSOR_CONN` |
+| `HUM` | Влажность не достигает уровня, нет воды в камере | Сухость дыхательной смеси | `CHAMBER`, `AUTOFILL`, `HEATER` |
 
-## 11. Связь с документами
+## 11. Источники доменных данных
 
 | Источник | Что берём |
 |---|---|
-| РЭ ТЕВЛАР | устройство, органы управления, аварийные коды, правила эксплуатации |
-| Паспорт | технические характеристики, комплектность, ресурсы |
-| ТУ | требования безопасности, приёмка, методы контроля |
+| Демонстрационное описание изделия | устройство, органы управления, условные коды отказов |
+| Демонстрационные технические параметры | характеристики, комплектность, ресурсы |
+| Демонстрационные требования | требования безопасности, приёмка, методы контроля |
 | ГОСТ ISO 8185-2012 | требования к увлажнителям дыхательных смесей |
 | ГОСТ Р МЭК 60601-1-2022 | общая безопасность медицинских электрических изделий |
 | ГОСТ Р ИСО 14971 | менеджмент риска медицинских изделий |
