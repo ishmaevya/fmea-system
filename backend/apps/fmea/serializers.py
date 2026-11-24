@@ -8,6 +8,7 @@ from .audit import log_action
 from .llm import create_suggestion
 from .models import (
     Attachment,
+    AuditLog,
     FMEAItem,
     FMEARevision,
     LLMSuggestion,
@@ -562,3 +563,25 @@ class RevisionReportSerializer(serializers.Serializer):
     summary = ReportSummarySerializer()
     top_risks = TopRiskSerializer(many=True)
     generated_at = serializers.DateTimeField()
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    user_email = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuditLog
+        fields = (
+            "id",
+            "user",
+            "user_email",
+            "action",
+            "entity_type",
+            "entity_id",
+            "payload",
+            "ip_address",
+            "created_at",
+        )
+        read_only_fields = fields
+
+    def get_user_email(self, obj) -> str | None:
+        return obj.user.email if obj.user_id else None

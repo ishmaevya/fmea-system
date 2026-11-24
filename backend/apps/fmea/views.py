@@ -15,10 +15,11 @@ from apps.accounts.permissions import IsAdminRole, IsEngineerOrAbove, IsQualityO
 
 from .attachments import delete_attachment, get_download_url
 from .audit import log_action
-from .filters import FMEAItemFilter
+from .filters import AuditLogFilter, FMEAItemFilter
 from .llm import apply_suggestion, reject_suggestion
 from .models import (
     Attachment,
+    AuditLog,
     FMEAItem,
     FMEARevision,
     LLMSuggestion,
@@ -28,6 +29,7 @@ from .reports import build_report, build_xlsx
 from .serializers import (
     AttachmentSerializer,
     AttachmentUploadSerializer,
+    AuditLogSerializer,
     BulkItemsSerializer,
     CloneRevisionSerializer,
     FMEAItemSerializer,
@@ -619,3 +621,21 @@ class SuggestionViewSet(
         suggestion = self.get_object()
         suggestion = reject_suggestion(suggestion, user=request.user, request=request)
         return Response(self.get_serializer(suggestion).data)
+
+
+@extend_schema_view(
+    list=extend_schema(tags=["Аудит"], summary="Журнал аудита"),
+    retrieve=extend_schema(tags=["Аудит"], summary="Событие аудита"),
+)
+class AuditLogViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    queryset = AuditLog.objects.select_related("user")
+    serializer_class = AuditLogSerializer
+    filterset_class = AuditLogFilter
+    search_fields = ("action", "entity_type", "entity_id")
+    ordering_fields = ("created_at", "action", "entity_type")
+    ordering = ("-created_at",)
+    permission_classes = (IsAdminRole,)
