@@ -1,64 +1,87 @@
-import { Card, Col, Container, ListGroup, Row } from "react-bootstrap";
+import { Badge, Card, Col, Container, ListGroup, Row } from "react-bootstrap";
+import { useAuth } from "../auth/AuthContext";
 import { HealthBadge } from "../components/HealthBadge";
 
-const nextSteps = [
-  "Модели изделия, компонентов и FMEA-ревизий",
-  "JWT-авторизация и разграничение ролей",
-  "FMEA-таблица с расчётом RPN",
-  "Граф зависимостей отказов",
-  "Отчёты и экспорт",
-  "LLM-подсказки",
+const roleLabels = {
+  engineer: "Инженер-конструктор",
+  quality: "Менеджер по качеству",
+  admin: "Администратор",
+} as const;
+
+const backendFeatures = [
+  "Каталог изделий, исполнений и компонентов",
+  "Версионные FMEA-ревизии и workflow",
+  "Пункты FMEA, RPN, приоритеты и фильтры",
+  "Граф связей и массовое сохранение",
+  "Вложения через MinIO",
+  "LLM-заглушка с подтверждением инженером",
+  "Отчёты и экспорт XLSX",
+  "Журнал аудита для администратора",
+];
+
+const frontendSteps = [
+  "Страницы входа и каталога",
+  "Карточка изделия и список ревизий",
+  "FMEA-таблица и массовое редактирование",
+  "Граф зависимостей",
+  "Подсказки, вложения и отчёты",
 ];
 
 export function HomePage() {
+  const { user } = useAuth();
+
   return (
-    <Container className="py-5">
+    <Container>
       <Row className="g-4 align-items-stretch">
         <Col lg={7}>
-          <Card className="h-100 shadow-sm border-0">
+          <Card className="h-100 border-0 shadow-sm">
             <Card.Body className="p-4">
               <div className="d-flex justify-content-between align-items-start mb-3">
                 <div>
                   <h1 className="h3 mb-1">FMEA System</h1>
                   <p className="text-secondary mb-0">
-                    Каркас проекта готов к разработке доменной модели.
+                    Анализ видов и последствий отказов медицинских изделий
                   </p>
                 </div>
                 <HealthBadge />
               </div>
-              <p className="mb-3">
-                Система предназначена для ведения анализа видов и последствий
-                отказов медицинских изделий: структура изделия, ревизии FMEA,
-                оценки риска, связи между отказами и отчёты.
+
+              {user && (
+                <div className="mb-4">
+                  <Badge bg="light" text="dark" className="me-2">
+                    {user.email}
+                  </Badge>
+                  <Badge bg="primary">{roleLabels[user.role]}</Badge>
+                </div>
+              )}
+
+              <p>
+                Backend Этапа 3 готов и покрыт тестами. Сейчас строим frontend:
+                навигацию, каталог, FMEA-таблицу, граф, вложения, подсказки и
+                отчёты.
               </p>
-              <Card className="bg-light border-0">
-                <Card.Body>
-                  <h2 className="h6 text-uppercase text-secondary">
-                    Реализовано на шаге 2
-                  </h2>
-                  <ListGroup variant="flush">
-                    <ListGroup.Item className="bg-transparent px-0">
-                      Django 5 + DRF + SimpleJWT, кастомный пользователь
-                    </ListGroup.Item>
-                    <ListGroup.Item className="bg-transparent px-0">
-                      PostgreSQL, Redis и MinIO в docker-compose
-                    </ListGroup.Item>
-                    <ListGroup.Item className="bg-transparent px-0">
-                      Health-check и Swagger-документация API
-                    </ListGroup.Item>
-                  </ListGroup>
-                </Card.Body>
-              </Card>
+
+              <h2 className="h6 text-uppercase text-secondary mt-4">
+                Реализовано в backend
+              </h2>
+              <ListGroup variant="flush">
+                {backendFeatures.map((feature) => (
+                  <ListGroup.Item key={feature} className="px-0 bg-transparent">
+                    {feature}
+                  </ListGroup.Item>
+                ))}
+              </ListGroup>
             </Card.Body>
           </Card>
         </Col>
+
         <Col lg={5}>
-          <Card className="h-100 shadow-sm border-0">
+          <Card className="h-100 border-0 shadow-sm">
             <Card.Body className="p-4">
-              <h2 className="h5 mb-3">Следующие шаги</h2>
-              <ListGroup variant="flush">
-                {nextSteps.map((step) => (
-                  <ListGroup.Item key={step} className="bg-transparent px-0">
+              <h2 className="h5 mb-3">План frontend</h2>
+              <ListGroup variant="flush" numbered>
+                {frontendSteps.map((step) => (
+                  <ListGroup.Item key={step} className="px-0 bg-transparent">
                     {step}
                   </ListGroup.Item>
                 ))}
